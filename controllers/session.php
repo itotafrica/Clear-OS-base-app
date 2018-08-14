@@ -64,7 +64,6 @@ class Session extends ClearOS_Controller
 
     /**
      * Access denied helper
-     *
      * @return view
      */
 
