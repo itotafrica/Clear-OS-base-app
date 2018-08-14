@@ -1,0 +1,52 @@
+#!/bin/sh
+
+if [ "$1" == "clearsync_change_event" ]; then
+    logger -p local6.notice -t clearsync "base - clearsync configuration change detected"
+
+    # Flock was not behaving, so use simple file test
+    [ -e /var/tmp/clearsync-restart ] && exit 0
+    touch /var/tmp/clearsync-restart
+
+    trap "rm -f /var/tmp/clearsync-restart" 0 1 2 3 15
+
+    # See note about hack below
+    while ( [ -n "`/sbin/pidof -x wc-yum`" ] || [ -n "`/sbin/pidof -x yum`" ] || [ -n "`ps af | grep syncaction | grep -v grep | grep -v clearsync_change_event`" ] ); do
+        sleep 3
+    done
+
+    logger -p local6.notice -t clearsync 'base - restarting clearsync'
+    /sbin/service clearsyncd condrestart >/dev/null 2>&1
+
+    rm -f /var/tmp/clearsync-restart
+
+elif [ "$1" == "webconfig_change_event" ]; then
+    logger -p local6.notice -t clearsync "base - webconfig restart requested"
+
+    # Flock and trap were not working here (?), so use this hack instead
+    IS_RUNNING=`ps af | grep -c "syncaction[[:space:]]*webconfig_change_event"`
+    if [ $IS_RUNNING == 3 ]; then
+        logger -p local6.notice -t clearsync 'base - webconfig restart already queued'
+        exit 0
+    fi
+    
+    while ( [ -n "`/sbin/pidof -x wc-yum`" ] || [ -n "`/sbin/pidof -x yum`" ] ); do
+        sleep 3
+    done
+
+    # Daemon reload is needed for tracker #5521
+    logger -p local6.notice -t clearsync 'base - restarting webconfig'
+    systemctl daemon-reload >/dev/null 2>&1
+    /sbin/service webconfig restart
+
+    # TODO: this is a workaround for a weird issue when system-mysqld is installed
+    # It dies (process dead) when the above webconfig restart is performed.
+    logger -p local6.notice -t clearsync 'base - checking system database'
+    sleep 3
+    PID=`/sbin/pidof system-mysqld`
+    if ( [ -z "$PID" ] && [ -e /var/lock/subsys/system-mysqld ] ); then
+        logger -p local6.notice -t clearsync 'base - reviving system-mysqld'
+        /sbin/service system-mysqld stop >/dev/null 2>&1
+        sleep 2
+        /sbin/service system-mysqld start >/dev/null 2>&1
+    fi
+fi
