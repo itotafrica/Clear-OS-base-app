@@ -7,7 +7,7 @@ include_once("loading_logo.php");
  * @package    base
  * @subpackage views
  * @author     ClearFoundation <developer@clearfoundation.com>
- * @copyright  2013 ClearFoundation
+ * @copyright  2013-2018 ClearFoundation
  * @license    http://www.gnu.org/copyleft/gpl.html GNU General Public License version 3 or later
  * @link       http://www.clearfoundation.com/docs/developer/apps/base/
  */
